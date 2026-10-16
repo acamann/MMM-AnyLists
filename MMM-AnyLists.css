@@ -17,6 +17,67 @@
 }
 
 /* -----------------------------------------------------
+   Panel header (config.header) with the checked-items toggle
+   ----------------------------------------------------- */
+.anylists-panel-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 4px 18px 10px;
+  margin-bottom: 8px;
+  border-bottom: 4px solid var(--theme-border, #e0e0e0);
+}
+
+.anylists-panel-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 40px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Reads the show/hide state: slashed eye while checked items are hidden, solid
+   accent eye while they are on screen. Circular to echo the item checkboxes,
+   and sized well past the 40px touch floor. */
+.anylists-toggle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: inherit;
+  color: var(--theme-text-muted, #5f6368);
+  background: transparent;
+  border: 2px solid var(--theme-border, #e0e0e0);
+  border-radius: 50%;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.anylists-toggle svg {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+.anylists-toggle:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.anylists-toggle.is-on {
+  color: var(--theme-accent, #1a73e8);
+  border-color: var(--theme-accent, #1a73e8);
+}
+
+/* -----------------------------------------------------
    Columns
    ----------------------------------------------------- */
 .anylists-columns {

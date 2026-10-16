@@ -18,6 +18,9 @@ Module.register('MMM-AnyLists', {
 		textAlign: 'left', // 'left' / 'center'
 		showQuantities: false,
 		columnSeparator: true,
+		header: 'To Do', // '' = no panel header
+		showCheckedToggle: true, // render the show/hide-checked button
+		hideCheckedItems: true, // initial state, before the user taps
 		animationSpeed: 0
 	},
 
@@ -25,6 +28,7 @@ Module.register('MMM-AnyLists', {
 		this.loaded = false;
 		this.error = null;
 		this.retrying = false;
+		this.showChecked = this._readCheckedVisibility();
 		// Parallel to config.lists: serialized list object, {name, notFound: true},
 		// or null until data arrives.
 		this.listsData = this.config.lists.map(() => null);
@@ -52,6 +56,11 @@ Module.register('MMM-AnyLists', {
 	getDom() {
 		const wrapper = document.createElement('div');
 		wrapper.className = 'anylists';
+
+		const header = this._buildHeader();
+		if (header) {
+			wrapper.append(header);
+		}
 
 		if (this.error) {
 			const error = document.createElement('div');
@@ -110,6 +119,85 @@ Module.register('MMM-AnyLists', {
 		}
 	},
 
+	_buildHeader() {
+		const {header, showCheckedToggle} = this.config;
+
+		// Nothing to draw: no title and no toggle.
+		if (!header && !showCheckedToggle) {
+			return null;
+		}
+
+		const bar = document.createElement('div');
+		bar.className = 'anylists-panel-header';
+
+		const title = document.createElement('div');
+		title.className = 'anylists-panel-title';
+		title.textContent = header;
+		bar.append(title);
+
+		if (showCheckedToggle) {
+			const toggle = document.createElement('button');
+			toggle.type = 'button';
+			toggle.className = 'anylists-toggle';
+			if (this.showChecked) {
+				toggle.classList.add('is-on');
+			}
+
+			// Icon only, so the header stays quiet. The wording goes on the
+			// tooltip and aria-label.
+			const action = this.showChecked ? 'Hide checked items' : 'Show checked items';
+			toggle.title = action;
+			toggle.setAttribute('aria-label', action);
+			toggle.setAttribute('aria-pressed', this.showChecked ? 'true' : 'false');
+			toggle.append(_eyeIcon(this.showChecked));
+
+			toggle.addEventListener('click', () => this._toggleCheckedVisibility());
+			bar.append(toggle);
+		}
+
+		return bar;
+	},
+
+	_toggleCheckedVisibility() {
+		this.showChecked = !this.showChecked;
+		this._saveCheckedVisibility();
+		this.updateDom(this.config.animationSpeed);
+	},
+
+	// Scoped by identifier so two instances keep separate preferences; the v2
+	// prefix retires the key written before `hideCheckedItems` was negated.
+	_checkedStorageKey() {
+		return `MMM-AnyLists:showChecked:v2:${this.identifier || 'default'}`;
+	},
+
+	// Returns `showChecked`, so the config's `hideCheckedItems` has to be
+	// negated on the way out — they are opposite questions.
+	_readCheckedVisibility() {
+		try {
+			const stored = window.localStorage.getItem(this._checkedStorageKey());
+			if (stored === 'true') {
+				return true;
+			}
+			if (stored === 'false') {
+				return false;
+			}
+		} catch (err) {
+			// Storage can be unavailable (disabled, or a browser that throws).
+			// The config default is a fine answer either way.
+			console.warn(`[MMM-AnyLists] could not read the checked-items preference: ${err.message}`);
+		}
+
+		return !this.config.hideCheckedItems;
+	},
+
+	_saveCheckedVisibility() {
+		try {
+			window.localStorage.setItem(this._checkedStorageKey(), this.showChecked ? 'true' : 'false');
+		} catch (err) {
+			console.warn(`[MMM-AnyLists] could not save the checked-items preference: ${err.message}`);
+		}
+	},
+
 	_retry() {
 		if (this.retrying) {
 			return;
@@ -148,7 +236,9 @@ Module.register('MMM-AnyLists', {
 			return column;
 		}
 
-		let items = list.items || [];
+		const allItems = list.items || [];
+		// Filter before slicing so maxItemsPerList counts visible rows.
+		let items = this.showChecked ? allItems : allItems.filter(item => !item.checked);
 
 		if (this.config.maxItemsPerList > 0) {
 			items = items.slice(0, this.config.maxItemsPerList);
@@ -157,7 +247,8 @@ Module.register('MMM-AnyLists', {
 		if (items.length === 0) {
 			const empty = document.createElement('div');
 			empty.className = 'anylists-status';
-			empty.textContent = 'No items';
+			// A column whose items are all checked and hidden is finished, not empty.
+			empty.textContent = allItems.length > 0 ? 'All done' : 'No items';
 			column.append(empty);
 			return column;
 		}
@@ -211,3 +302,52 @@ Module.register('MMM-AnyLists', {
 		this.sendSocketNotification('TOGGLE_ITEM', {listId, identifier});
 	}
 });
+
+/* Eye glyph for the header toggle: a plain eye while checked items are shown,
+ * one with a slash across it while they are hidden. Inline SVG keeps the
+ * module free of an icon font for the two shapes it needs. */
+function _eyeIcon(showing) {
+	const NS = 'http://www.w3.org/2000/svg';
+	const svg = document.createElementNS(NS, 'svg');
+	svg.setAttribute('viewBox', '0 0 24 24');
+	svg.setAttribute('aria-hidden', 'true');
+
+	const almond = document.createElementNS(NS, 'ellipse');
+	almond.setAttribute('cx', '12');
+	almond.setAttribute('cy', '12');
+	almond.setAttribute('rx', '10');
+	almond.setAttribute('ry', '7');
+
+	const pupil = document.createElementNS(NS, 'circle');
+	pupil.setAttribute('cx', '12');
+	pupil.setAttribute('cy', '12');
+	pupil.setAttribute('r', '2.5');
+
+	if (showing) {
+		// Solid eye; the pupil is knocked out in the panel's background color.
+		almond.setAttribute('fill', 'currentColor');
+		pupil.setAttribute('fill', 'var(--theme-bg, #ffffff)');
+		svg.append(almond, pupil);
+		return svg;
+	}
+
+	almond.setAttribute('fill', 'none');
+	almond.setAttribute('stroke', 'currentColor');
+	almond.setAttribute('stroke-width', '1.8');
+	pupil.setAttribute('fill', 'none');
+	pupil.setAttribute('stroke', 'currentColor');
+	pupil.setAttribute('stroke-width', '1.8');
+
+	const slash = document.createElementNS(NS, 'line');
+	slash.setAttribute('x1', '4');
+	slash.setAttribute('y1', '4');
+	slash.setAttribute('x2', '20');
+	slash.setAttribute('y2', '20');
+	slash.setAttribute('stroke', 'currentColor');
+	slash.setAttribute('stroke-width', '2');
+	slash.setAttribute('stroke-linecap', 'round');
+
+	svg.append(almond, pupil, slash);
+
+	return svg;
+}

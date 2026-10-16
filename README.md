@@ -13,8 +13,24 @@ to write check-offs back to AnyList.
 - Kids check items off on the mirror.
 - Both stay in sync via AnyList's websocket-driven live update channel.
 
-Checked items stay visible, struck-through and dimmed, until they are removed
-in the AnyList app.
+Checked items are hidden by default so the panel reads as what is left to do.
+An eye toggle on the right of the header brings them back: a slashed eye while
+they are hidden, a solid accent eye while they are shown. The chosen visibility
+is stored in `localStorage` and survives a server restart; clear the
+`MMM-AnyLists:showChecked:v2:*` key to go back to the configured default.
+
+## Panel layout
+
+```
+┌──────────────────────────────────────────────┐
+│  To Do                                     👁  │  ← header + eye toggle
+├───────────────┬───────────────┬──────────────┤
+│    Daniel      │     Luke      │     Ben      │  ← one column per list
+│  ☐ Feed dog   │  ☐ Homework   │  ☐ Practice  │
+│  ☐ Take out   │  ☐ Pack bag   │              │
+│   trash       │               │              │
+└───────────────┴───────────────┴──────────────┘
+```
 
 ## Installation
 
@@ -42,6 +58,9 @@ Add to `config/config.js`:
     textAlign: 'left',
     showQuantities: false,
     columnSeparator: true,
+    header: 'To Do',              // panel title above the lists; '' hides it
+    showCheckedToggle: true,      // show/hide-checked button on the header's right
+    hideCheckedItems: true,       // initial state, before the first tap
   }
 }
 ```
@@ -71,6 +90,9 @@ loads all configured lists.
 | `textAlign` | Item text alignment: `'left'` or `'center'`. | `'left'` |
 | `showQuantities` | Show each item's quantity after its name. | `false` |
 | `columnSeparator` | Draw a thin vertical separator between columns. | `true` |
+| `header` | Panel title shown above the columns. `''` removes the header bar. | `'To Do'` |
+| `showCheckedToggle` | Render the eye toggle on the right of the header. | `true` |
+| `hideCheckedItems` | Whether checked items start hidden. The last tapped state is remembered from then on. | `true` |
 | `animationSpeed` | DOM update animation in ms. `0` = instant. | `0` |
 
 ## How it works
