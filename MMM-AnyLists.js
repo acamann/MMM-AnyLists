@@ -24,6 +24,7 @@ Module.register('MMM-AnyLists', {
 	start() {
 		this.loaded = false;
 		this.error = null;
+		this.retrying = false;
 		// Parallel to config.lists: serialized list object, {name, notFound: true},
 		// or null until data arrives.
 		this.listsData = this.config.lists.map(() => null);
@@ -56,6 +57,10 @@ Module.register('MMM-AnyLists', {
 			const error = document.createElement('div');
 			error.className = 'anylists-error';
 			error.textContent = this.error;
+			// The helper retries on its own; this is the manual escape hatch
+			// for a failure that outlived those attempts.
+			error.classList.add('retryable');
+			error.addEventListener('click', () => this._retry());
 			wrapper.append(error);
 		}
 
@@ -88,13 +93,42 @@ Module.register('MMM-AnyLists', {
 	socketNotificationReceived(notification, payload) {
 		if (notification === 'LIST_DATA') {
 			this.error = null;
+			this.retrying = false;
 			this.loaded = true;
 			this.listsData = payload.lists;
 			this.updateDom(this.config.animationSpeed);
 		} else if (notification === 'ANYLIST_ERROR') {
-			this.error = payload;
+			this.retrying = false;
+			// The helper sends {message, detail}; detail keeps the full
+			// server-side context in the browser console.
+			this.error = typeof payload === 'string' ? payload : payload.message;
+			if (payload && payload.detail) {
+				// eslint-disable-next-line no-console
+				console.error(`[MMM-AnyLists] ${payload.detail}`);
+			}
 			this.updateDom(this.config.animationSpeed);
 		}
+	},
+
+	_retry() {
+		if (this.retrying) {
+			return;
+		}
+
+		this.retrying = true;
+		this.error = null;
+		this.sendSocketNotification('RETRY', {});
+		this.updateDom(this.config.animationSpeed);
+
+		// If the helper goes quiet (crashed, socket down), let the banner
+		// come back rather than leaving a permanent "Loading ...".
+		setTimeout(() => {
+			if (this.retrying) {
+				this.retrying = false;
+				this.error = 'No reply from AnyList — tap to retry.';
+				this.updateDom(this.config.animationSpeed);
+			}
+		}, 15000);
 	},
 
 	_buildColumn(list, index) {

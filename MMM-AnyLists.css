@@ -159,3 +159,15 @@
   background: #fce8e6;
   border-bottom: 1px solid var(--theme-border, #e0e0e0);
 }
+
+/* Tappable banner — tapping asks the node helper to reconnect. */
+.anylists-error.retryable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.anylists-error.retryable:active {
+  background: #f9d9d6;
+}
